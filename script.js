@@ -56,6 +56,7 @@ async function init() {
             userEmail.textContent = `Logged in as: ${currentUser.email}`;
             showAppInterface();
             await loadUserUsage(currentUser.id);
+            await loadUserDetections();
         } else {
             showLoginInterface();
         }
@@ -123,6 +124,7 @@ function setupAuthListeners() {
             userEmail.textContent = `Logged in as: ${currentUser.email}`;
             showAppInterface();
             await loadUserUsage(currentUser.id);
+            await loadUserDetections();
         } catch (error) {
             console.error('Login error:', error);
             setStatus(`Login failed: ${error.message}`, 'error');
@@ -203,6 +205,7 @@ function setupAuthListeners() {
             userEmail.textContent = `Logged in as: ${currentUser.email}`;
             showAppInterface();
             loadUserUsage(currentUser.id);
+            loadUserDetections();
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
             showLoginInterface();
@@ -547,6 +550,70 @@ async function captureAndSend() {
 startCameraBtn.addEventListener('click', startCamera);
 stopCameraBtn.addEventListener('click', stopCamera);
 captureBtn.addEventListener('click', captureAndSend);
+
+// Load user detections
+async function loadUserDetections() {
+    if (!currentUser) return;
+    
+    try {
+        setStatus('Loading your detections...', 'info');
+        
+        const { data, error } = await supabase
+            .from('detections')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('timestamp', { ascending: false })
+            .limit(10);
+        
+        if (error) throw error;
+        
+        // Create a gallery container
+        const galleryContainer = document.createElement('div');
+        galleryContainer.style.display = 'flex';
+        galleryContainer.style.flexWrap = 'wrap';
+        galleryContainer.style.gap = '10px';
+        galleryContainer.style.marginTop = '20px';
+        
+        if (data.length === 0) {
+            galleryContainer.innerHTML = '<p>No detections saved yet. Capture some images!</p>';
+        } else {
+            // Add each image to the gallery
+            data.forEach(item => {
+                const imgContainer = document.createElement('div');
+                imgContainer.style.width = '200px';
+                
+                const img = document.createElement('img');
+                img.src = item.image_data;
+                img.style.width = '100%';
+                img.style.height = 'auto';
+                img.alt = 'Detection from ' + new Date(item.timestamp).toLocaleString();
+                
+                const caption = document.createElement('div');
+                caption.style.fontSize = '12px';
+                caption.style.textAlign = 'center';
+                caption.textContent = new Date(item.timestamp).toLocaleString();
+                
+                imgContainer.appendChild(img);
+                imgContainer.appendChild(caption);
+                galleryContainer.appendChild(imgContainer);
+            });
+        }
+        
+        // Clear previous gallery and add the new one
+        const existingGallery = document.getElementById('detections-gallery');
+        if (existingGallery) {
+            existingGallery.remove();
+        }
+        
+        galleryContainer.id = 'detections-gallery';
+        document.getElementById('app-content').appendChild(galleryContainer);
+        
+        setStatus('Your recent detections loaded.', 'success');
+    } catch (error) {
+        console.error('Error loading detections:', error);
+        setStatus(`Error loading detections: ${error.message}`, 'error');
+    }
+}
 
 // Start the application
 init();

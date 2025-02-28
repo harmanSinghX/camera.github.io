@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detection Images Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .detection-card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .detection-image {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .detection-info {
+            font-size: 14px;
+            color: #555;
+        }
+        .objects-list {
+            margin-top: 10px;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="login-container" class="login-container">
+        <h2>Admin Login</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button id="login-btn">Login</button>
+    </div>
+
+    <div id="admin-container" style="display: none;">
+        <h1>Detection Images</h1>
+        <div id="detection-list"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        // Initialize Supabase - replace with your actual values
+        const supabaseUrl = 'YOUR_SUPABASE_URL';
+        const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const loginContainer = document.getElementById('login-container');
+        const adminContainer = document.getElementById('admin-container');
+        const detectionList = document.getElementById('detection-list');
+        const loginBtn = document.getElementById('login-btn');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+
+        // Check if user is already logged in
+        async function checkAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                showAdmin();
+                loadDetections();
+            }
+        }
+
+        // Handle login
+        loginBtn.addEventListener('click', async () => {
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: emailInput.value,
+                    password: passwordInput.value
+                });
+                
+                if (error) throw error;
+                
+                showAdmin();
+                loadDetections();
+            } catch (error) {
+                alert('Login failed: ' + error.message);
+            }
+        });
+
+        // Show admin interface
+        function showAdmin() {
+            loginContainer.style.display = 'none';
+            adminContainer.style.display = 'block';
+        }
+
+        // Load detections from Supabase
+        async function loadDetections() {
+            try {
+                const { data, error } = await supabase
+                    .from('detections')
+                    .select('*')
+                    .order('timestamp', { ascending: false });
+                
+                if (error) throw error;
+                
+                renderDetections(data);
+            } catch (error) {
+                console.error('Error loading detections:', error);
+                alert('Failed to load detections: ' + error.message);
+            }
+        }
+
+        // Render detections to the page
+        function renderDetections(detections) {
+            detectionList.innerHTML = '';
+            
+            if (!detections || detections.length === 0) {
+                detectionList.innerHTML = '<p>No detections found.</p>';
+                return;
+            }
+            
+            detections.forEach(detection => {
+                const card = document.createElement('div');
+                card.className = 'detection-card';
+                
+                // Format date
+                const date = new Date(detection.timestamp).toLocaleString();
+                
+                // Create elements
+                card.innerHTML = `
+                    <img src="${detection.image_data}" class="detection-image" alt="Detection Image">
+                    <div class="detection-info">
+                        <p><strong>Date:</strong> ${date}</p>
+                        <p><strong>User:</strong> ${detection.email}</p>
+                        <p><strong>Objects Detected:</strong> ${detection.total_objects_detected}</p>
+                        <div class="objects-list">
+                            <strong>Detected Objects:</strong>
+                            <ul>
+                                ${detection.detections.map(d => 
+                                    `<li>${d.class} (${Math.round(d.confidence * 100)}%)</li>`
+                                ).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+                
+                detectionList.appendChild(card);
+            });
+        }
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html> 
