@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object Recognition</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #video-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            border: 1px solid #ccc;
+            overflow: hidden;
+        }
+        #video, #canvas {
+            width: 100%;
+            height: auto;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        button {
+            display: block;
+            margin: 10px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #status {
+            text-align: center;
+            color: #333;
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background-color: #e2f3f5;
+            color: #0c5460;
+        }
+        .auth-container {
+            max-width: 400px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .auth-container input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .auth-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            cursor: pointer;
+            background-color: #e9e9e9;
+        }
+        .auth-tab.active {
+            background-color: #4285f4;
+            color: white;
+        }
+        #user-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        #usage-stats {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .quality-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .quality-controls label, .quality-controls select {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-time Object Detection</h1>
+    
+    <!-- Authentication section -->
+    <div id="auth-container" class="auth-container">
+        <div class="auth-tabs">
+            <div id="login-tab" class="auth-tab active">Login</div>
+            <div id="signup-tab" class="auth-tab">Sign Up</div>
+        </div>
+        
+        <div id="login-form">
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <button id="login-button">Login</button>
+        </div>
+        
+        <div id="signup-form" style="display: none;">
+            <input type="email" id="signup-email" placeholder="Email" required>
+            <input type="password" id="signup-password" placeholder="Password" required>
+            <input type="password" id="signup-confirm-password" placeholder="Confirm Password" required>
+            <button id="signup-button">Sign Up</button>
+        </div>
+    </div>
+    
+    <!-- User info section -->
+    <div id="user-container" style="display: none;">
+        <p id="user-email"></p>
+        <button id="logout-button">Logout</button>
+        
+        <!-- Usage statistics -->
+        <div id="usage-stats">
+            <h3>Your Usage</h3>
+            <p id="storage-used">Storage used: 0 MB</p>
+            <p id="detection-count">Detections saved: 0</p>
+        </div>
+    </div>
+    
+    <!-- Main app content - initially hidden until authenticated -->
+    <div id="app-content" style="display: none;">
+        <div id="video-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button id="start-camera">Start Camera</button>
+            <button id="stop-camera" disabled>Stop Camera</button>
+            <button id="capture" disabled>Send to Database</button>
+        </div>
+        
+        <!-- Image quality settings -->
+        <div class="quality-controls">
+            <label for="image-quality">Image Quality:</label>
+            <select id="image-quality">
+                <option value="0.9">High (Larger Size)</option>
+                <option value="0.7" selected>Medium (Recommended)</option>
+                <option value="0.5">Low (Smaller Size)</option>
+                <option value="0.3">Very Low (Minimal Size)</option>
+            </select>
+            
+            <label for="image-max-size" style="margin-left: 15px;">Max Width:</label>
+            <select id="image-max-size">
+                <option value="1280">1280px (HD)</option>
+                <option value="800" selected>800px (Recommended)</option>
+                <option value="640">640px (Small)</option>
+                <option value="320">320px (Minimal)</option>
+            </select>
+        </div>
+        
+        <div id="status" class="info">Please login to continue</div>
+        <div id="detection-list"></div>
+    </div>
+
+    <!-- TensorFlow.js and COCO-SSD -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    
+    <!-- ES modules script -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>
